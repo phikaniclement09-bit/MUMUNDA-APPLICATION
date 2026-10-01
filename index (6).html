@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mumunda – Zimbabwe Farm Marketplace & GIS</title>
+<meta name="theme-color" content="#176b3a">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--g:#176b3a;--m:#f4c542;--s:#173126;--bg:#f4f8f4;--c:#fff;--l:#dce7df;--lg:#eaf6ec}
+@media(prefers-color-scheme:dark){:root{--bg:#121a15;--c:#1c2620;--l:#33413a;--s:#eee;--lg:#24332a}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--s);padding-bottom:72px}
+header{background:linear-gradient(135deg,var(--g),#0d4e2b);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:1.3rem}header h1 span{color:var(--m)}#net{font-size:.75rem;background:var(--m);color:#3d3000;padding:2px 9px;border-radius:9px}
+main{max-width:760px;margin:auto;padding:12px}section{display:none}section.on{display:block}
+.card{background:var(--c);border:1px solid var(--l);border-radius:14px;padding:12px;margin:10px 0}
+h2{margin:10px 0 6px}h3{margin:0 0 4px}.small{font-size:.82rem;opacity:.75}.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--g);padding-bottom:env(safe-area-inset-bottom);z-index:900}
+nav button{flex:1;background:none;border:0;color:#cfe3d8;padding:8px 2px;font-size:.68rem}nav button b{display:block;font-size:1.15rem}
+nav button.on{color:var(--m);border-top:3px solid var(--m)}
+.b{background:var(--g);color:#fff;border:0;border-radius:10px;padding:10px 14px;text-decoration:none;display:inline-block;margin:3px 3px 3px 0;font-size:.9rem;cursor:pointer}.b.y{background:var(--m);color:#3d3000}.b.a{background:var(--lg);color:var(--g)}
+input,select{width:100%;padding:10px;margin:4px 0;border:1px solid var(--l);border-radius:10px;background:var(--c);color:var(--s);font-size:1rem}
+#map{height:380px;border-radius:14px;border:1px solid var(--l);background:#dcefd5}
+.hero{background:linear-gradient(120deg,#eff9e9,#fff6ce);color:#173126;border-radius:20px;padding:18px;margin:10px 0}.hero h2{font-size:1.6rem;margin:0 0 6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.crop{text-align:center}.crop .e{font-size:2.6rem}
+.tag{display:inline-block;padding:1px 9px;border-radius:9px;background:#fff2bd;color:#725300;font-size:.75rem;font-weight:700;margin-right:4px}
+.chips{display:flex;gap:6px;overflow:auto;padding:4px 0}.chips button{border:1px solid var(--l);background:var(--c);color:var(--s);border-radius:99px;padding:6px 12px;white-space:nowrap}.chips button.on{background:var(--g);color:#fff}
+.bar{height:8px;border-radius:4px;background:var(--l);overflow:hidden}.bar i{display:block;height:100%;background:var(--g)}
+.pay{border:2px solid var(--l);border-radius:12px;padding:10px;background:var(--c);color:var(--s);text-align:left}.pay.on{border-color:var(--g);background:var(--lg)}
+.big{font-size:1.7rem;font-weight:900;color:var(--g)}.in{color:#2a8a4a}.out{color:#c0392b}
+.modal{display:none;position:fixed;inset:0;background:#0008;z-index:1000;align-items:center;justify-content:center;padding:16px}.modal.show{display:flex}.mb{background:var(--c);border-radius:18px;max-width:560px;width:100%;padding:18px;max-height:88vh;overflow:auto}
+.pk{width:30px;height:30px;border-radius:50%;background:#fff;border:2px solid var(--g);display:grid;place-items:center;font-size:16px}
+#pv{max-width:100%;max-height:170px;border-radius:10px;margin-top:8px;display:none}
+</style></head><body>
+<header><h1>Mumunda <span>Zim</span></h1><span id="net">online</span></header>
+<main>
+<section id="home" class="on">
+ <div class="hero"><h2>Buy, sell and plan smarter.</h2><div>Find crops near you on the map, check quality from a photo, and decide with GIS.</div>
+ <input id="q" placeholder="Search maize, tobacco, cotton, soybeans…" oninput="F.q=this.value.toLowerCase();renderMkt();draw()">
+ <button class="b" onclick="go('mkt')">Search marketplace</button><button class="b y" onclick="go('sell')">List your crop</button></div>
+ <div class="card"><b>Indicative prices (USD per tonne)</b><div id="prices"></div><div class="small">Prototype prices. Production needs a verified market feed.</div></div>
+ <h2>Cash crops</h2><div class="grid" id="crops"></div>
+ <div class="card"><b>Built for low data</b><div class="small">Works offline after first load. Records, listings and your last forecast are saved on your phone. Use Data saver in the Map tab to skip map tiles.</div></div>
+</section>
+<section id="mkt"><h2>Marketplace</h2><div class="chips" id="chips"></div><div id="list"></div>
+ <h2>Markets</h2><div id="mkts"></div></section>
+<section id="gis"><h2>Map & spatial analysis</h2>
+ <div class="small">Products and markets on OpenStreetMap. Tap the map to place your farm, or use GPS.</div>
+ <button class="b" onclick="gps()">Use my location</button>
+ <select id="mf" onchange="setF(this.value)"></select>
+ <label class="small">Search radius: <b id="rv">100</b> km<input id="rad" type="range" min="10" max="400" step="10" value="100" oninput="rv.textContent=this.value;analyse()"></label>
+ <label class="small"><input type="checkbox" id="saver" style="width:auto" onchange="set.saver=this.checked;SV('set',set);location.reload()"> Data saver (no map tiles, no auto weather)</label>
+ <div id="map"></div><div id="ana"></div></section>
+<section id="sell"><h2>Sell your crop</h2>
+ <div class="card"><select id="sc" onchange="calcPrice()"></select>
+ <input id="sv" placeholder="Variety (e.g. SC 403)">
+ <select id="sg" onchange="calcPrice()"><option value="A">Grade A / Premium</option><option value="B">Grade B / Standard</option><option value="C">Grade C</option></select>
+ <div class="row"><input id="qty" type="number" min="0" step="0.1" value="5" oninput="calcPrice()" style="flex:2"><select id="un" onchange="calcPrice()" style="flex:1"><option value="1">tonnes</option><option value="0.001">kg</option><option value="0.1">bales (100kg)</option></select></div>
+ <input id="ph" placeholder="Your WhatsApp number (+2637…)" inputmode="tel">
+ <div class="card" style="background:var(--lg)"><div class="small">Indicative offer</div><div class="big" id="est"></div><div class="small" id="fo"></div></div>
+ <div class="small">Listing location: your farm pin on the map.</div>
+ <button class="b" onclick="pub(false)">Publish listing</button><button class="b a" onclick="pub(true)">Save draft offline</button></div>
+ <h3>Photo quality check</h3><div class="card"><div class="small">Take or choose a photo of the crop. The app measures colour, dark spots and uniformity on your phone (no upload). It is a guide, not a lab grade.</div>
+ <input type="file" accept="image/*" id="qi" onchange="qcheck(this)"><img id="pv" alt="">
+ <div id="qr"></div></div>
+ <h3>Payment method</h3><div class="grid" id="pays"></div><div class="small">Demo only. A live version must use an approved payment gateway, never store PINs.</div>
+ <h3>My listings</h3><div id="mine"></div></section>
+<section id="farm"><h2>Weather</h2><div class="small" id="wl"></div><button class="b" onclick="loadWx(true)">Refresh forecast</button><div id="wx"></div>
+ <h2>Farm records</h2>
+ <div class="card"><select id="rt"><option value="in">Income</option><option value="out">Expense</option></select><input id="rn" placeholder="What for? (e.g. Maize seed)"><input id="ra" type="number" placeholder="Amount (USD)"><input id="rd" type="date"><button class="b" onclick="addRec()">Save record</button></div>
+ <div id="rs" class="card"></div><div id="recs"></div><button class="b y" onclick="csv()">Export CSV</button></section>
+<section id="learn"><h2>Farming know-how</h2><div id="info"></div><h2>Ask an expert</h2><div id="exp"></div><h2>Funding</h2><div id="fin"></div></section>
+</main>
+<nav id="nav"></nav>
+<div id="modal" class="modal" onclick="if(event.target==this)closeM()"><div class="mb"><div class="row"><h2 id="mt"></h2><button class="b a" onclick="closeM()">Close</button></div><div id="mv"></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* SAMPLE DATA: replace with verified datasets (OSM, ZimStat, ZAEA, market feeds) */
+const CR={Maize:['🌽',315],Soybeans:['🫘',560],Cotton:['🌿',620],Tobacco:['🍃',3200]},GF={A:1,B:.9,C:.78};
+const VAR={Maize:[['SC 403','A'],['SC 513','A'],['ZM 521','B'],['Local grain','C']],Soybeans:[['High-protein','A'],['Standard','B'],['Feed-grade','C']],Cotton:[['Premium lint','A'],['Standard lint','B'],['Commercial lint','C']],Tobacco:[['Flue-cured premium','A'],['Leaf grade B','B'],['Leaf grade C','C']]};
+const LST=[["l1","Maize","SC 403","A",12,"Marondera farm",-18.19,31.55,"+263770000101"],["l2","Maize","SC 513","A",30,"Mazowe growers",-17.53,30.98,"+263770000102"],["l3","Soybeans","High-protein","A",8,"Chinhoyi co-op",-17.36,30.2,"+263770000103"],["l4","Tobacco","Flue-cured premium","A",3,"Rusape farmers",-18.53,32.13,"+263770000104"],["l5","Cotton","Standard lint","B",15,"Gokwe cotton",-18.22,28.93,"+263770000105"],["l6","Maize","ZM 521","B",20,"Gweru farm",-19.45,29.82,"+263770000106"],["l7","Soybeans","Standard","B",6,"Bindura farm",-17.3,31.33,"+263770000107"],["l8","Cotton","Premium lint","A",9,"Chiredzi growers",-21.05,31.67,"+263770000108"],["l9","Maize","Local grain","C",5,"Masvingo farm",-20.07,30.83,"+263770000109"],["l10","Tobacco","Leaf grade B","B",2,"Mutoko farmers",-17.4,32.22,"+263770000110"]].map(x=>({id:x[0],c:x[1],v:x[2],g:x[3],q:x[4],s:x[5],lat:x[6],lng:x[7],ph:x[8]}));
+const MARKETS=[["Mbare Musika, Harare",-17.86,31.03],["Sakubva, Mutare",-18.98,32.65],["Renkini, Bulawayo",-20.16,28.58],["Masvingo Market",-20.07,30.83],["Gweru Market",-19.45,29.82],["Chinhoyi Market",-17.36,30.2],["Marondera Market",-18.19,31.55],["Bindura Market",-17.3,31.33],["Kwekwe Market",-18.93,29.81],["Chiredzi Market",-21.05,31.67]];
+const WATER=[["Lake Chivero",-17.9,30.8],["Mazowe Dam",-17.53,30.98],["Lake Mutirikwi",-20.22,30.87],["Tokwe-Mukosi Dam",-20.55,30.75],["Lake Kariba",-16.52,28.8],["Osborne Dam",-19,32.5],["Ncema Dam",-20.3,28.7]];
+const SERVICES=[["Extension office, Harare",-17.83,31.05],["Agro-dealer, Marondera",-18.18,31.55],["Extension office, Mutare",-18.97,32.67],["Agro-dealer, Bulawayo",-20.15,28.59],["Extension office, Masvingo",-20.06,30.83],["Agro-dealer, Gweru",-19.46,29.81],["Extension office, Chinhoyi",-17.37,30.2],["Extension office, Chiredzi",-21.04,31.66]];
+const REGIONS=[["I",-19.8,32.9],["IIa",-17.9,31],["IIb",-17.5,30.2],["III",-19.4,29.8],["IV",-20.1,30.8],["V",-21,31.7],["V",-20.9,29]];
+const SUIT={I:[["Tea, coffee, fruit",3],["Potatoes",3],["Maize",2]],IIa:[["Maize",3],["Soya beans",3],["Tobacco",3],["Wheat (irrigated)",3],["Groundnuts",2]],IIb:[["Maize",3],["Soya beans",3],["Tobacco",2],["Cattle",2]],III:[["Sorghum",3],["Sunflower",3],["Groundnuts",3],["Cotton",2],["Maize",2]],IV:[["Sorghum / millets",3],["Cowpeas",3],["Goats & cattle",3],["Cotton",2],["Maize",1]],V:[["Cattle & goats",3],["Sugarcane (irrigated)",3],["Sorghum / millets",2],["Maize",1]]};
+const INFO=[["Plant with the first good rains","Wait for 25mm+ over 2-3 days before planting maize."],["Conservation farming","Dig planting basins, mulch and rotate with legumes."],["Store grain safely","Dry maize below 12.5% moisture and store off the ground."],["Know your costs","Record every input and sale before setting a price."]];
+const EXP=[["Extension officer (AGRITEX)","Crop and soil advice","+263770000001"],["Livestock vet","Animal health","+263770000002"],["Horticulture agronomist","Vegetables and irrigation","+263770000003"],["Agribusiness mentor","Business planning, pricing","+263770000004"]];
+const FIN=[["Youth agripreneur grants","Ask your ward youth officer for open calls.","Grant"],["Agribank small-scale loans","Seasonal inputs and equipment. Bring a business plan and ID.","Loan"],["Contract farming","Inputs supplied, repaid in produce (tobacco, soya, cotton).","Contract"],["Savings groups (ISAL)","Village lending groups build capital without bank fees.","Savings"]];
+const PAYS=["EcoCash","InnBucks","ZIPIT","Visa / Mastercard","O'mari","Bank transfer"];
+const $=id=>document.getElementById(id),LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const nearest=(s,p,n=1)=>s.map(x=>({n:x[0],km:hav(p.lat,p.lng,x[1],x[2])})).sort((a,b)=>a.km-b.km).slice(0,n);
+const price=(c,g)=>Math.round(CR[c][1]*GF[g]);
+let farm=LS('farm',{lat:-17.83,lng:31.05}),set=LS('set',{saver:false}),F={c:'All',q:''},pay=LS('pay',PAYS[0]),map,fm,lg,circ,mk={};
+const all=()=>LST.concat(LS('mine',[]).filter(x=>!x.draft));
+const match=l=>(F.c=='All'||l.c==F.c||(F.c=='Bulk'&&l.q>=10)||(F.c=='Near'&&hav(farm.lat,farm.lng,l.lat,l.lng)<150))&&(!F.q||(l.c+l.v+l.s).toLowerCase().includes(F.q));
+/* nav */
+const T=[["home","⌂","Home"],["mkt","🛒","Market"],["gis","🗺️","Map"],["sell","＋","Sell"],["farm","🌦️","Farm"],["learn","📘","Learn"]];
+$('nav').innerHTML=T.map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')"><b>${t[1]}</b>${t[2]}</button>`).join('');
+function go(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==id));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==id));scrollTo(0,0);if(id=='gis'&&map)setTimeout(()=>map.invalidateSize(),60);if(id=='farm')loadWx()}
+function net(){$('net').textContent=navigator.onLine?'online':'offline – saved data'}addEventListener('online',net);addEventListener('offline',net);net();$('saver').checked=set.saver;
+/* filters */
+const FL=['All','Maize','Soybeans','Cotton','Tobacco','Bulk','Near'],FN={Bulk:'Bulk 10t+',Near:'Near me'};
+function setF(c){F.c=c;$('mf').value=c;renderMkt();draw();chips()}
+function chips(){$('chips').innerHTML=FL.map(f=>`<button class="${F.c==f?'on':''}" onclick="setF('${f}')">${FN[f]||f}</button>`).join('')}
+$('mf').innerHTML=FL.map(f=>`<option value="${f}">${FN[f]||f}</option>`).join('');
+/* home */
+$('prices').innerHTML=Object.keys(CR).map(c=>`<div class="row"><span>${CR[c][0]} ${c} · Grade A</span><b>$${CR[c][1]}/t</b></div>`).join('');
+$('crops').innerHTML=Object.keys(CR).map(c=>`<div class="card crop"><div class="e">${CR[c][0]}</div><h3>${c}</h3><button class="b" onclick="openCrop('${c}')">Varieties</button><button class="b a" onclick="setF('${c}');go('mkt')">Find</button></div>`).join('');
+function openCrop(c){$('mt').textContent=c+' varieties & prices';$('mv').innerHTML=VAR[c].map(v=>`<div class="card row"><span><b>${v[0]}</b><br><span class="tag">Grade ${v[1]}</span></span><b>$${price(c,v[1])}/t</b></div>`).join('')+`<button class="b y" onclick="closeM();setF('${c}');go('mkt')">See ${c} for sale</button>`;$('modal').classList.add('show')}
+function closeM(){$('modal').classList.remove('show')}
+/* marketplace */
+function wa(ph,t){return `https://wa.me/${ph.replace(/\D/g,'')}?text=${encodeURIComponent(t)}`}
+function msg(l){return `Hello, I saw your ${l.q}t ${l.c} (${l.v}, Grade ${l.g}) on Mumunda at $${price(l.c,l.g)}/t. Preferred payment: ${pay}. Is it available?`}
+function renderMkt(){const L=all().filter(match).map(l=>({...l,km:hav(farm.lat,farm.lng,l.lat,l.lng)})).sort((a,b)=>a.km-b.km);
+ $('list').innerHTML=L.length?L.map(l=>`<div class="card"><div class="row"><h3>${CR[l.c][0]} ${esc(l.c)} · ${esc(l.v)}</h3><b>$${price(l.c,l.g)}/t</b></div><span class="tag">Grade ${l.g}</span><span class="tag">${l.q} t</span><span class="tag">${l.km.toFixed(0)} km away</span><div class="small">${esc(l.s)}</div><button class="b a" onclick="showOn('${l.id}')">Show on map</button>${l.ph?`<a class="b" target="_blank" rel="noopener" href="${wa(l.ph,msg(l))}">WhatsApp seller</a>`:''}</div>`).join(''):'<div class="card">No listings match. Try another crop or clear the search.</div>';
+ $('mkts').innerHTML=MARKETS.map(x=>({n:x[0],a:x[1],b:x[2],km:hav(farm.lat,farm.lng,x[1],x[2])})).sort((a,b)=>a.km-b.km).map(x=>`<div class="card row"><span>${esc(x.n)}<br><span class="small">${x.km.toFixed(0)} km</span></span><a class="b" target="_blank" rel="noopener" href="https://www.openstreetmap.org/directions?from=${farm.lat},${farm.lng}&to=${x.a},${x.b}">Directions</a></div>`).join('')}
+function showOn(id){go('gis');const m=mk[id];if(m&&map){setTimeout(()=>{map.invalidateSize();map.setView(m.getLatLng(),10);m.openPopup()},120)}}
+/* map */
+const ic=(e,c)=>L.divIcon({className:'',html:`<div class="pk" style="border-color:${c}">${e}</div>`,iconSize:[30,30],iconAnchor:[15,15]});
+function initMap(){
+ if(typeof L==='undefined'){$('map').innerHTML='<p class="card">Map library not cached yet. Connect once. Listings and analyses still work.</p>';return}
+ map=L.map('map').setView([farm.lat,farm.lng],7);
+ if(!set.saver)L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:13,attribution:'© OpenStreetMap contributors'}).addTo(map);
+ const o={};
+ [["Markets 🏪",MARKETS,'🏪','#e4a900'],["Water 💧",WATER,'💧','#2a7fd4'],["Services 🔧",SERVICES,'🔧','#7a3fa0']].forEach(([n,d,e,c])=>{o[n]=L.layerGroup(d.map(x=>L.marker([x[1],x[2]],{icon:ic(e,c)}).bindPopup('<b>'+esc(x[0])+'</b>'))).addTo(map)});
+ lg=L.layerGroup().addTo(map);o["Products 🌾"]=lg;L.control.layers(null,o).addTo(map);
+ fm=L.marker([farm.lat,farm.lng],{draggable:true,icon:ic('📍','#c0392b'),zIndexOffset:1000}).addTo(map).bindPopup('My farm');
+ fm.on('dragend',()=>setFarm(fm.getLatLng().lat,fm.getLatLng().lng));map.on('click',e=>setFarm(e.latlng.lat,e.latlng.lng));
+ circ=L.circle([farm.lat,farm.lng],{radius:100000,color:'#176b3a',fillOpacity:.05}).addTo(map);draw()}
+function draw(){if(!lg)return;lg.clearLayers();mk={};all().filter(match).forEach(l=>{const m=L.marker([l.lat,l.lng],{icon:ic(CR[l.c][0],'#176b3a')}).bindPopup(`<b>${CR[l.c][0]} ${esc(l.c)} · ${esc(l.v)}</b><br>Grade ${l.g} · ${l.q} t<br>$${price(l.c,l.g)}/t<br>${esc(l.s)}<br>${hav(farm.lat,farm.lng,l.lat,l.lng).toFixed(0)} km from your farm`+(l.ph?`<br><a href="${wa(l.ph,msg(l))}" target="_blank" rel="noopener">WhatsApp seller</a>`:''));mk[l.id]=m;lg.addLayer(m)});analyse()}
+function setFarm(a,b){farm={lat:a,lng:b};SV('farm',farm);if(fm)fm.setLatLng([a,b]);if(circ)circ.setLatLng([a,b]);draw();analyse();renderMkt();$('wl').textContent=''}
+function gps(){navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>{setFarm(p.coords.latitude,p.coords.longitude);map&&map.setView([farm.lat,farm.lng],9)},()=>alert('Location blocked. Tap the map instead.')):alert('GPS not available.')}
+/* spatial analyses */
+function analyse(){
+ const rad=+$('rad').value,m=nearest(MARKETS,farm,3),w=nearest(WATER,farm)[0],s=nearest(SERVICES,farm)[0],reg=nearest(REGIONS,farm)[0].n,hrs=k=>(k*1.4/45).toFixed(1);
+ if(circ)circ.setRadius(rad*1000);
+ const ins=all().filter(l=>hav(farm.lat,farm.lng,l.lat,l.lng)<=rad),cnt={};ins.forEach(l=>cnt[l.c]=(cnt[l.c]||0)+l.q);
+ $('ana').innerHTML=`<div class="card"><h3>1. Crop suitability · region ${reg}</h3><div class="small">Nearest natural farming region. Confirm with a soil test.</div>${SUIT[reg].map(c=>`<div class="row"><span>${esc(c[0])}</span><span class="tag">${['','Marginal','Suitable','Best fit'][c[1]]}</span></div><div class="bar"><i style="width:${c[1]*33}%"></i></div>`).join('')}</div>
+ <div class="card"><h3>2. Market accessibility</h3>${m.map(x=>`<div class="row"><span>${esc(x.n)}</span><b>${x.km.toFixed(0)} km · ~${hrs(x.km)} h</b></div>`).join('')}<div class="small">Estimate: 45 km/h, 1.4 road factor.</div></div>
+ <div class="card"><h3>3. Water proximity</h3><div class="row"><span>${esc(w.n)}</span><b>${w.km.toFixed(0)} km</b></div>${w.km<10?'Good for irrigation':w.km<40?'Possible with pipes or boreholes':'Plan boreholes or water harvesting'}</div>
+ <div class="card"><h3>4. Service accessibility</h3><div class="row"><span>${esc(s.n)}</span><b>${s.km.toFixed(0)} km</b></div>${s.km<25?'Easy reach for inputs and advice':'Far: consider group buying or phone advice'}</div>
+ <div class="card"><h3>5. Products within ${rad} km</h3>${ins.length?`<b>${ins.length} listings, ${ins.reduce((a,l)=>a+l.q,0)} t</b>`+Object.keys(cnt).map(c=>`<div class="row"><span>${CR[c][0]} ${c}</span><span>${cnt[c]} t</span></div>`).join(''):'None in range. Widen the radius.'}</div>`}
+/* sell */
+$('sc').innerHTML=Object.keys(CR).map(c=>`<option>${c}</option>`).join('');
+function calcPrice(){const c=$('sc').value,g=$('sg').value,q=+$('qty').value||0,u=+$('un').value,t=q*u;$('est').textContent='$'+(price(c,g)*t).toLocaleString(undefined,{maximumFractionDigits:2});$('fo').textContent=`$${CR[c][1]}/t × grade factor ${GF[g]} × ${t.toFixed(3)} t. Indicative only.`}
+function pub(draft){const q=(+$('qty').value||0)*(+$('un').value);if(q<=0)return alert('Enter a quantity above zero.');const ph=$('ph').value.trim();if(!draft&&!/^\+?\d{9,15}$/.test(ph.replace(/[\s-]/g,'')))return alert('Enter a valid WhatsApp number so buyers can reach you.');
+ const a=LS('mine',[]);a.unshift({id:'m'+Date.now(),c:$('sc').value,v:$('sv').value.trim()||'Unspecified',g:$('sg').value,q:+q.toFixed(3),s:'My farm',lat:farm.lat,lng:farm.lng,ph,draft});SV('mine',a);showMine();draw();renderMkt();alert(draft?'Draft saved on your phone.':'Listing published. It is now on the map and in the marketplace.')}
+function showMine(){const a=LS('mine',[]);$('mine').innerHTML=a.length?a.map((x,i)=>`<div class="card row"><span>${CR[x.c][0]} ${esc(x.c)} · ${x.q} t · Grade ${x.g}<br><span class="tag">${x.draft?'Draft':'Published'}</span></span><span>${x.draft?`<button class="b a" onclick="publishDraft(${i})">Publish</button>`:''}<button class="b" onclick="delMine(${i})">Remove</button></span></div>`).join(''):'<div class="card small">Nothing yet. Fill in the form above.</div>'}
+function publishDraft(i){const a=LS('mine',[]);if(!a[i].ph)return alert('Add a WhatsApp number in the form, then publish again as a new listing.');a[i].draft=false;SV('mine',a);showMine();draw();renderMkt()}
+function delMine(i){const a=LS('mine',[]);a.splice(i,1);SV('mine',a);showMine();draw();renderMkt()}
+$('pays').innerHTML=PAYS.map(p=>`<button class="pay" onclick="setPay('${p}')">${p}</button>`).join('');
+function setPay(p){pay=p;SV('pay',p);document.querySelectorAll('.pay').forEach(b=>b.classList.toggle('on',b.textContent==p));renderMkt()}
+/* photo quality check (runs on device) */
+let qg='B';
+function qcheck(inp){const f=inp.files[0];if(!f)return;const img=new Image(),u=URL.createObjectURL(f);img.onload=()=>{
+ const cv=document.createElement('canvas');cv.width=cv.height=64;const x=cv.getContext('2d');x.drawImage(img,0,0,64,64);const d=x.getImageData(0,0,64,64).data;let dark=0,pale=0,n=0,sum=0,sq=0;
+ for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2],l=.299*r+.587*g+.114*b,mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx?(mx-mn)/mx:0;n++;sum+=l;sq+=l*l;if(l<50)dark++;if(sat<.1&&l>110)pale++}
+ const mean=sum/n,sd=Math.sqrt(Math.max(0,sq/n-mean*mean)),sc=Math.max(0,Math.min(100,Math.round(100-dark/n*160-pale/n*60-Math.max(0,sd-55)*.8)));qg=sc>=80?'A':sc>=60?'B':'C';
+ $('pv').src=u;$('pv').style.display='block';
+ $('qr').innerHTML=`<div class="card"><div class="row"><span>Crop</span><b>${esc($('sc').value)} (from your form)</b></div><div class="row"><span>Visual score</span><b>${sc}%</b></div><div class="row"><span>Dark spots</span><b>${(dark/n*100).toFixed(0)}%</b></div><div class="row"><span>Suggested grade</span><b>${qg}</b></div><button class="b y" onclick="$('sg').value=qg;calcPrice()">Use grade ${qg} in my listing</button><div class="small">Visual guide only. Confirm moisture and foreign matter with a proper grader.</div></div>`};
+ img.onerror=()=>$('qr').innerHTML='<div class="card">Could not read that image. Try a JPG or PNG.</div>';img.src=u}
+/* learn */
+$('info').innerHTML=INFO.map(i=>`<details class="card"><summary><b>${esc(i[0])}</b></summary><p>${esc(i[1])}</p></details>`).join('');
+$('exp').innerHTML=EXP.map(e=>`<div class="card"><h3>${esc(e[0])}</h3><div class="small">${esc(e[1])}</div><a class="b" href="tel:${e[2]}">Call</a><a class="b y" target="_blank" rel="noopener" href="https://wa.me/${e[2].slice(1)}?text=${encodeURIComponent('Hello, I need farming advice')}">WhatsApp</a><a class="b a" href="sms:${e[2]}">SMS</a></div>`).join('');
+$('fin').innerHTML=FIN.map(f=>`<div class="card"><span class="tag">${f[2]}</span><h3>${esc(f[0])}</h3>${esc(f[1])}</div>`).join('');
+/* records */
+$('rd').valueAsDate=new Date();
+function addRec(){const n=$('rn').value.trim(),a=+$('ra').value;if(!n||!a)return alert('Enter a description and amount.');const r=LS('recs',[]);r.unshift({t:$('rt').value,n,a,d:$('rd').value});SV('recs',r);$('rn').value=$('ra').value='';showRecs()}
+function showRecs(){const r=LS('recs',[]),i=r.filter(x=>x.t=='in').reduce((s,x)=>s+x.a,0),o=r.filter(x=>x.t=='out').reduce((s,x)=>s+x.a,0);
+ $('rs').innerHTML=`<div class="row"><span>Income</span><b class="in">$${i.toFixed(2)}</b></div><div class="row"><span>Expenses</span><b class="out">$${o.toFixed(2)}</b></div><div class="row"><span>Profit</span><b>$${(i-o).toFixed(2)}</b></div>`;
+ $('recs').innerHTML=r.length?r.map((x,k)=>`<div class="card row"><span>${esc(x.d)} · ${esc(x.n)}</span><span class="${x.t}">${x.t=='in'?'+':'-'}$${x.a}</span><button class="b" onclick="delRec(${k})">×</button></div>`).join(''):'<div class="card small">No records yet. Add your first sale or expense.</div>'}
+function delRec(k){const r=LS('recs',[]);r.splice(k,1);SV('recs',r);showRecs()}
+function csv(){const r=LS('recs',[]);const t='date,type,description,amount\n'+r.map(x=>[x.d,x.t,'"'+x.n.replace(/"/g,'""')+'"',x.a].join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='farm-records.csv';a.click()}
+/* weather */
+async function loadWx(force){const c=LS('wx',null),fresh=c&&Date.now()-c.t<3*36e5&&hav(c.lat,c.lng,farm.lat,farm.lng)<10;
+ if(fresh&&!force)return showWx(c,false);
+ if(set.saver&&!force)return c?showWx(c,true):($('wx').innerHTML='<div class="card">Data saver is on. Tap Refresh forecast to download (about 1 KB).</div>');
+ try{const j=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${farm.lat.toFixed(2)}&longitude=${farm.lng.toFixed(2)}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=5`)).json();const d={t:Date.now(),lat:farm.lat,lng:farm.lng,d:j.daily};SV('wx',d);showWx(d,false)}
+ catch(e){c?showWx(c,true):$('wx').innerHTML='<div class="card">No forecast saved yet. Connect once to download it.</div>'}}
+function showWx(c,old){$('wl').textContent=`Forecast for ${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}`+(old?' (saved '+new Date(c.t).toLocaleString()+')':'');const d=c.d;
+ $('wx').innerHTML=d.time.map((t,i)=>`<div class="card row"><span>${new Date(t).toLocaleDateString(undefined,{weekday:'short',day:'numeric'})}</span><span>${Math.round(d.temperature_2m_min[i])}–${Math.round(d.temperature_2m_max[i])}°C</span><b>${d.precipitation_sum[i]} mm</b></div>`).join('')+'<div class="card small">Plant when 25mm+ falls over 2–3 days. Avoid spraying on rainy days.</div>'}
+/* init */
+chips();setPay(pay);calcPrice();renderMkt();showMine();showRecs();initMap();analyse();go('home');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
